@@ -1,0 +1,21 @@
+(defn pd
+  [num denom]
+  (if (= denom 0)
+    0
+    (quot num denom)))
+
+(defn select-terminal
+  []
+  (rand-nth (concat (range 1 11) (map #(* % -1) (range 11)))))
+
+(defn select-fun
+  []
+  (rand-nth '( + - * pd)))
+
+(select-terminal)
+
+(select-fun)
+
+(defn generate-prog
+  [depth]
+  )
