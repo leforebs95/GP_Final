@@ -6,16 +6,24 @@
 
 (defn select-terminal
   []
-  (rand-nth (concat (range 1 11) (map #(* % -1) (range 11)))))
+  (let [random (rand-int 2)]
+    (if (zero? random)
+      (rand-nth (concat (list(rand 11)) (list(*  -1 (rand 11)))))
+      'x)))
 
 (defn select-fun
   []
   (rand-nth '( + - * pd)))
 
-(select-terminal)
-
-(select-fun)
-
 (defn generate-prog
   [depth]
-  )
+  (if (zero? depth)
+    (select-terminal)
+    (list (select-fun)
+      (generate-prog (dec depth))
+      (generate-prog (dec depth)))))
+
+(defn generate-pop
+  [pop-size]
+  (take pop-size
+        (repeatedly #(generate-prog (rand-int 4)))))
