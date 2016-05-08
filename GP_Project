@@ -1,0 +1,246 @@
+(ns genetic-programming.core
+  (:require [clojure.zip :as zip]))
+
+(defn make-program-into-fn
+  "Takes a GP program represented as a list, with input x,
+   and transforms it into a function that can be called on an input.
+   NOTE: If your GP uses variables other than x, will need to change
+         the argument list below to something other than [x]!"
+  [program]
+  (eval (list 'fn '[x] program)))
+
+(def target
+  (map #(vector % (+ (* % % %) % 3))
+       (range -10.0 10.0)))
+
+(def instructions
+  '{+ 2
+    * 2
+    - 2
+    inc 1})
+
+(def line-separator
+  "-------------------------------------------------------------------------")
+
+(defn program-size
+  "Finds the size of the program, i.e. number of nodes in its tree."
+  [prog]
+  (if (not (seq? prog))
+    1
+    (count (flatten prog))))
+
+(defn pd
+  [num denom]
+  (if (zero? denom)
+    0
+    (/ num denom)))
+
+(defn select-terminal
+  []
+  (let [random (rand-int 2)]
+    (if (zero? random)
+      (rand-nth (concat (list(rand 11)) (list(*  -1 (rand 11)))))
+      'x)))
+
+(defn select-fun
+  []
+  (rand-nth '(+ - * pd)))
+
+(defn generate-prog
+  [depth]
+  (if (zero? depth)
+    (select-terminal)
+    (list (select-fun)
+      (generate-prog (dec depth))
+      (generate-prog (dec depth)))))
+
+(defn generate-pop
+  [pop-size]
+  (take pop-size
+        (repeatedly #(generate-prog (rand-int 2)))))
+
+(defn eval-fitness 
+  "Evaluates the error of an individual (the lower, the better)."
+  [prog]
+  (let [prog-function (make-program-into-fn prog)]
+    (reduce + (map (fn [[var1 var2]] 
+                     (Math/abs (-' (prog-function var1) var2)))
+                   target))))
+
+(defn select-random-subtree
+  "Given a program, selects a random subtree and returns it."
+  ([prog]
+    (select-random-subtree prog (rand-int (program-size prog))))
+  ([prog subtree-index]
+    (cond
+      (not (seq? prog)) prog
+      (and (zero? subtree-index)
+           (some #{(first prog)} (keys instructions))) prog
+      (< subtree-index (program-size (first prog))) (recur (first prog)
+                                                           subtree-index)
+      :else (recur (rest prog)
+                   (- subtree-index (program-size (first prog)))))))
+
+(defn replace-random-subtree
+  "Given a program and a replacement-subtree, replace a random node
+   in the program with the replacement-subtree."
+  ([prog replacement-subtree]
+      (replace-random-subtree prog replacement-subtree (rand-int (program-size prog))))
+  ([prog replacement-subtree subtree-index]
+    (cond
+      (not (seq? prog)) replacement-subtree
+      (zero? subtree-index) replacement-subtree
+      :else (map (fn [element start-index]
+                   (if (<= start-index
+                           subtree-index
+                           (+ start-index -1 (program-size element)))
+                     (replace-random-subtree element
+                                             replacement-subtree
+                                             (- subtree-index start-index))
+                     element))
+                 prog
+                 (cons 0 (reductions + (map program-size prog)))))))
+
+(defn mutate
+  [prog]
+  (replace-random-subtree prog (generate-prog 2) (rand-int (program-size prog))))
+
+(defn crossover
+ [prog1 prog2]
+ (replace-random-subtree prog1 
+                         (select-random-subtree prog2 (rand-int (program-size prog2)))
+                         (rand-int (program-size prog1))))
+
+(defn inject
+  "Returns a copy of individual i with new inserted randomly somwhere within it (replacing something else)."
+  [new i]
+  (if (seq? i)
+    (if (zero? (rand-int (count (flatten i))))
+      new
+      (if (< (rand)
+              (/ (program-size (nth i 1))
+                 (- (program-size i) 1)))
+        (list (nth i 0) (inject new (nth i 1)) (nth i 2))
+        (list (nth i 0) (nth i 1) (inject new (nth i 2)))))
+    new))
+
+(defn extract
+  "Returns a random subexpression of individual i."
+  [i]
+  (if (seq? i)
+    (if (zero? (rand-int (count (flatten i))))
+      i
+      (if (< (rand) (/ (program-size (nth i 1))
+                       (- (program-size i)) 1))
+        (extract (nth i 1))
+        (extract (nth i 2))))
+    i))
+
+(defn mutate
+  [i]
+  (inject (generate-prog 2) i))
+
+(defn crossover
+  [i j]
+  (inject (extract j) i))
+
+(defn at-index 
+  "Returns a subtree of tree indexed by point-index in a depth first traversal."
+  [tree point-index]
+  (let [index (mod (Math/abs point-index) (program-size tree))
+        zipper (zip/seq-zip tree)]
+    (loop [z zipper i index]
+      (if (zero? i)
+        (zip/node z)
+        (if (seq? (zip/node z)) 
+          (recur (zip/next (zip/next z)) (dec i))
+          (recur (zip/next z) (dec i)))))))
+
+(defn insert-at-index
+  "Returns a copy of tree with the subtree formerly indexed by
+  point-index (in a depth-first traversal) replaced by new-subtree."
+  [tree point-index new-subtree]
+  (let [index (mod (Math/abs point-index) (program-size tree))
+        zipper (zip/seq-zip tree)]
+    (loop [z zipper i index]
+      (if (zero? i)
+        (zip/root (zip/replace z new-subtree))
+        (if (seq? (zip/node z))
+          (recur (zip/next (zip/next z)) (dec i))
+          (recur (zip/next z) (dec i)))))))
+
+(defn mutate
+  [i]
+  (insert-at-index i 
+                   (rand-int (program-size i)) 
+                   (generate-prog 2)))
+
+(defn crossover
+  [i j]
+  (insert-at-index i 
+                   (rand-int (program-size i)) 
+                   (at-index j (rand-int (program-size j)))))
+
+(defn pair-individuals-errors
+  "Returns a vector of [individual error] pairs."
+  [population]
+  (vec (map #(vector % (eval-fitness %)) population)))
+
+(defn sort-population
+  "Sorts the population by ascending order of errors."
+  [population]
+  (let [individuals-errors (pair-individuals-errors population)]
+    (vec (map first ; get the individuals only (discards the error from [individual error])
+              (sort #(< (second %1) (second %2)) individuals-errors)))))
+
+
+(defn random-selection
+  "Selects a random individual from the population of programs, without evaluating
+  the fitness of the programs."
+  [population]
+  (rand-nth population))
+
+(defn tournament-selection
+  "Selects an individual from the population of programs using tournament-like selection."
+  [population tournament-size]
+  (let [index-value (apply min (take tournament-size 
+                                     (repeatedly #(rand-int (count population)))))]
+    ; index-value is the lowest integer returned by getting index positions repeatedly from
+    ; the population. The individual at this index position is the fittest as compared to 
+    ; others in this tournament (assuming that the population is already sorted).
+    (nth population index-value)))
+  
+(defn evolve
+  [population-size max-generations mutation-ratio crossover-ratio error-threshold]
+  (if (> (+ mutation-ratio crossover-ratio) 1)
+    (println "Error: The sum of mutation and crossover ratios should be <= 1.")
+    (loop [generation-number 0
+           population (sort-population (generate-pop population-size))]
+      (let [best-individual (first population)
+          best-individual-error (eval-fitness best-individual)]
+        (println line-separator)
+        (println "Generation number:" generation-number)
+        (println "Best program so far:" best-individual)
+        (println "Best error so far:" best-individual-error)
+        (cond 
+          (< best-individual-error error-threshold) (println line-separator 
+                                                             "\nEvolution successful! \nProgram: " 
+                                                             best-individual
+                                                             "\nError:" best-individual-error)
+          (= generation-number max-generations) (println line-separator
+                                                         "\nMaximum number of generations exceeded! \nBest program so far:"
+                                                         best-individual
+                                                         "\nError:" best-individual-error)
+          :else (recur
+                  (inc generation-number)
+                  (sort-population
+                    (for [i (range population-size)]
+                      (let [genetic-operator (rand)]
+                        (cond
+                          (< genetic-operator mutation-ratio) (mutate (tournament-selection population 5))
+                          (< genetic-operator (+ mutation-ratio crossover-ratio))
+                                    (crossover (tournament-selection population 5) (tournament-selection population 5))
+                          :else (random-selection population)))))))))))
+                          
+
+(evolve 1000 50 0.5 0.4 0.1)
