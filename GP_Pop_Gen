@@ -31,15 +31,8 @@
 
 (defn eval-fitness
   [prog]
-  (let [prog-fn (make-program-into-fn prog)
-        best-fn (make-program-into-fn best-prog)]
-         (let [best-range (map best-fn (range 11))
-               prog-range (map prog-fn (range 11))]
-           (map first (iterate (fn [[real theoretical]]
-                                 (* (quot (Math/abs(- theoretical real)) theoretical) 100))
-                               [best-range
-                               prog-range])))))
-
-(eval-fitness prog)
-map (fn [real theoretical]
-           (* (quot (Math/abs(- theoretical real)) theoretical) 100))
+  (let [prog-fn (make-program-into-fn prog)]
+    (reduce + (map (fn [[x y]] 
+                     (Math/abs 
+                       (- (prog-fn x) y)))
+                   theoretical-value))))
