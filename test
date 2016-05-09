@@ -105,10 +105,17 @@
                  (cons 0 (reductions + (map program-size prog)))))))
 
 (defn mutate
+  "Generates a random program and places it in a given program"
   [prog]
   (replace-random-subtree prog (generate-prog (rand-int 3))))
 
+(defn hoist-mutate
+  "Replace parent program with one of its subtree"
+  [prog]
+  (replace-random-subtree prog (select-random-subtree prog) 0))
+
 (defn crossover
+  "Takes a random subtree of a program and places it in another" 
  [prog1 prog2]
  (replace-random-subtree prog1 (select-random-subtree prog2)))
 
