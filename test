@@ -1,4 +1,12 @@
 (ns genetic-programming.core)
+(def instructions
+  '{+ 2
+    * 2
+    - 2
+    pd 2})
+
+(def line-separator
+  "-------------------------------------------------------------------------")
 
 (defn make-program-into-fn
   "Takes a GP program represented as a list, with input x,
@@ -9,18 +17,9 @@
   (eval (list 'fn '[x] program)))
 
 (def target
+  "Our target function"
   (map #(vector % (+ (* % % %) % 3))
        (range -1.0 1.0 0.1)))
-
-(def instructions
-  '{+ 2
-    * 2
-    - 2
-    pd 2
-    inc 1})
-
-(def line-separator
-  "-------------------------------------------------------------------------")
 
 (defn program-size
   "Finds the size of the program, i.e. number of nodes in its tree."
@@ -30,12 +29,14 @@
     (count (flatten prog))))
 
 (defn pd
+  "Protected Division"
   [num denom]
   (if (zero? denom)
     0
     (/ num denom)))
 
 (defn select-terminal
+  "Selects a terminal, either an erc or x"
   []
   (let [random (rand-int 2)]
     (if (zero? random)
@@ -43,10 +44,12 @@
       'x)))
 
 (defn select-fun
+  "Selects a function from a list"
   []
   (rand-nth '(+ - * pd)))
 
 (defn generate-prog
+  "Generates a program of given depth"
   [depth]
   (if (zero? depth)
     (select-terminal)
@@ -55,13 +58,11 @@
       (generate-prog (dec depth)))))
 
 (defn generate-pop
+  "Generates a program population of a given size"
   [pop-size]
   (take pop-size
         (repeatedly #(generate-prog (rand-int 2)))))
-
-(def population 
-  (generate-pop 10))
-
+        
 (defn eval-fitness 
   "Evaluates the error of an individual (the lower, the better)."
   [prog]
