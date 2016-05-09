@@ -182,4 +182,6 @@
                           :else (tournament-selection population 7)))))))))))
                           
 
-(evolve 500 100 0.5 0.4 0.1)
+(defn genetic-programming
+  []
+  (evolve 500 100 0.6 0.3 0.1))
