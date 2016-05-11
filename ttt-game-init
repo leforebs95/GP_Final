@@ -1,10 +1,12 @@
 (ns tic-tac-toe.core)
 
-; these indexes are for reference only, and may not be used in the code elsewhere.
 (def indexes
   [[0 0 0] [0 0 1] [0 0 2] [0 1 0] [0 1 1] [0 1 2] [0 2 0] [0 2 1] [0 2 2]
    [1 0 0] [1 0 1] [1 0 2] [1 1 0] [1 1 1] [1 1 2] [1 2 0] [1 2 1] [1 2 2]
    [2 0 0] [2 0 1] [2 0 2] [2 1 0] [2 1 1] [2 1 2] [2 2 0] [2 2 1] [2 2 2]])
+
+(def all-winning-indexes
+  [])
 
 (defn create-game-board
   []
@@ -14,9 +16,12 @@
   )
 
 (defn create-player
-  [char]
+  [char] ; strategy to be implemented --> this is what we will "evolve"
   {:token char
-   :strategy "to be implemented"})
+   :strategy "to be implemented"
+   :wins 0
+   :losses 0
+   :ties 0})
 
 (defn new-game
   []
@@ -50,3 +55,13 @@
 (defn game-over?
   [board]
   (or (all-spots-taken? board) (winner? board)))
+
+; ================================ Strategy Functions ================================
+
+(defn choose-random-spot
+  "Returns an index representing a random, unoccupied spot on the board."
+  [board]
+  (let [index (rand-nth indexes)]
+    (if (= nil (get-value-at-index board index))
+      index
+      (recur (rand-nth indexes)))))
