@@ -1,0 +1,52 @@
+(ns tic-tac-toe.core)
+
+; these indexes are for reference only, and may not be used in the code elsewhere.
+(def indexes
+  [[0 0 0] [0 0 1] [0 0 2] [0 1 0] [0 1 1] [0 1 2] [0 2 0] [0 2 1] [0 2 2]
+   [1 0 0] [1 0 1] [1 0 2] [1 1 0] [1 1 1] [1 1 2] [1 2 0] [1 2 1] [1 2 2]
+   [2 0 0] [2 0 1] [2 0 2] [2 1 0] [2 1 1] [2 1 2] [2 2 0] [2 2 1] [2 2 2]])
+
+(defn create-game-board
+  []
+  [[[nil nil nil] [nil nil nil] [nil nil nil]]
+   [[nil nil nil] [nil nil nil] [nil nil nil]]
+   [[nil nil nil] [nil nil nil] [nil nil nil]]]
+  )
+
+(defn create-player
+  [char]
+  {:token char
+   :strategy "to be implemented"})
+
+(defn new-game
+  []
+  {:board (create-game-board)
+   :player1 (create-player "O")
+   :player2 (create-player "X")})
+
+(defn get-value-at-index
+  [board index]
+  (get-in board index))
+
+(defn valid-spot?
+  [board index]
+  (= nil (get-value-at-index board index)))
+
+(defn all-spots-taken?
+  [board]
+  (empty? (filter (fn [index] (= nil index)) (flatten board))))
+
+(defn take-turn
+  [board index player]
+  (if (valid-spot? board index)
+    (assoc board index (get player :token))
+    board))
+
+(defn winner?
+  "To be implemented..."
+  [board]
+  false)
+
+(defn game-over?
+  [board]
+  (or (all-spots-taken? board) (winner? board)))
