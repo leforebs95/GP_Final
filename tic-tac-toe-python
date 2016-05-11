@@ -1,0 +1,110 @@
+"""
+EDITED BY: HAMMAD AHMAD
+Project 2
+
+Author: Ken
+File: tictactoe.py
+
+Model for tictactoe.  Simply provides the next player's letter.
+"""
+
+import random
+
+class TicTacToe(object):
+    """Models a tictactoe game."""
+
+    def __init__(self):
+        """Sets up the model."""
+        self.newGame()
+
+    def __str__(self):
+        """Returns the string rep of the model."""
+        return self.letter
+                
+    def newGame(self):
+        """Resets the game to its initial state."""
+        self.letter = random.choice(("X", "O"))
+        self.winner = ""
+        self.squares = list()
+        for count in range(9):
+            self.squares.append("")
+
+    def hasWinner(self):
+        """Checks to see if someone has won the game."""
+        if self.winner != "":
+            return True
+        else:
+            if self.squares[0] == self.squares[1] and self.squares[1] == \
+               self.squares[2] and self.squares[1] != "":
+                self.winner = self.squares[1]
+                return True
+            elif self.squares[3] == self.squares[4] and self.squares[4] == \
+               self.squares[5] and self.squares[4] != "":
+                self.winner = self.squares[4]
+                return True
+            elif self.squares[6] == self.squares[7] and self.squares[7] == \
+               self.squares[8] and self.squares[7] != "":
+                self.winner = self.squares[7]
+                return True
+            elif self.squares[0] == self.squares[3] and self.squares[3] == \
+               self.squares[6] and self.squares[3] != "":
+                self.winner = self.squares[3]
+                return True
+            elif self.squares[1] == self.squares[4] and self.squares[4] == \
+               self.squares[7] and self.squares[4] != "":
+                self.winner = self.squares[4]
+                return True
+            elif self.squares[2] == self.squares[5] and self.squares[5] == \
+               self.squares[8] and self.squares[5] != "":
+                self.winner = self.squares[5]
+                return True
+            elif self.squares[0] == self.squares[4] and self.squares[4] == \
+               self.squares[8] and self.squares[4] != "":
+                self.winner = self.squares[4]
+                return True
+            elif self.squares[2] == self.squares[4] and self.squares[4] == \
+               self.squares[6] and self.squares[4] != "":
+                self.winner = self.squares[4]
+                return True
+            else:
+                return False
+
+    def setLetter(self, index, letter):
+        """Sets a letter at the index position in the squares list."""
+        self.squares[index] = letter
+
+    def __str__(self):
+        """Returns a 3 by 3 grid that shows the current state of the game."""
+        grid = ""
+        index = 0
+        for row in range(3):
+            for column in range(3):
+                if self.squares[index] == "":
+                    grid += "  "
+                else:
+                     grid += self.squares[index] + " "
+                index += 1
+            grid += "\n"
+        return grid
+
+    def nextLetter(self):
+        """Returns the next letter for play."""
+        if self.letter == "X":
+            self.letter = "O"
+        else:
+            self.letter = "X"
+        return self.letter
+
+def main():
+    """Starting point for the application."""
+    model = TicTacToe()
+    print(model)
+    for count in range(9):
+        model.setLetter(count, model.nextLetter())
+        print(model)
+        print(model.hasWinner())
+        print("\n")
+    
+if __name__ == "__main__":
+    main()
+ 
