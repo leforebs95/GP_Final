@@ -5,17 +5,96 @@
    [1 0 0] [1 0 1] [1 0 2] [1 1 0] [1 1 1] [1 1 2] [1 2 0] [1 2 1] [1 2 2]
    [2 0 0] [2 0 1] [2 0 2] [2 1 0] [2 1 1] [2 1 2] [2 2 0] [2 2 1] [2 2 2]])
 
-(def all-winning-indexes
-  [])
+(def all-winning-indexes [
+   ; y-axis                       
+   [[0 0 0] [1 0 0] [2 0 0]] 
+   [[0 1 0] [1 1 0] [2 1 0]]
+   [[0 2 0] [1 2 0] [2 2 0]]
+   
+   [[0 0 1] [1 0 1] [2 0 1]]
+   [[0 1 1] [1 1 1] [2 1 1]]
+   [[0 2 1] [1 2 1] [2 2 1]]
+   
+   [[0 0 2] [1 0 2] [2 0 2]]
+   [[0 1 2] [1 1 2] [2 1 2]]
+   [[0 2 2] [1 2 2] [2 2 2]]
+   
+   ; x-axis
+   [[0 0 0] [0 1 0] [0 2 0]]
+   [[1 0 0] [1 1 0] [1 2 0]]
+   [[2 0 0] [2 1 0] [2 2 0]]
+   
+   [[0 0 1] [0 1 1] [0 2 1]]
+   [[1 0 1] [1 1 1] [1 2 1]]
+   [[2 0 1] [2 1 1] [2 2 1]]
+   
+   [[0 0 2] [0 1 2] [0 2 2]]
+   [[1 0 2] [1 1 2] [1 2 2]]
+   [[2 0 2] [2 1 2] [2 2 2]]
+   
+   ; z-axis
+   [[0 0 0] [0 0 1] [0 0 2]]
+   [[1 0 0] [1 0 1] [1 0 2]]
+   [[2 0 0] [2 0 1] [2 0 2]]
+   
+   [[0 1 0] [0 1 1] [0 1 2]]
+   [[1 1 0] [1 1 1] [1 1 2]]
+   [[2 1 0] [2 1 1] [2 1 2]]
+   
+   [[0 2 0] [0 2 1] [0 2 2]]
+   [[1 2 0] [1 2 1] [1 2 2]]
+   [[2 2 0] [2 2 1] [2 2 2]]
+   
+   ; diagonals-xy
+   [[0 0 0] [1 1 0] [2 2 0]]
+   [[2 0 0] [1 1 0] [0 2 0]]
+   
+   [[0 0 1] [1 1 1] [2 2 1]]
+   [[2 0 1] [1 1 1] [0 2 1]]
+   
+   [[0 0 2] [1 1 2] [2 2 2]]
+   [[2 0 2] [1 1 2] [0 2 2]]
+   
+   ; diagonals-xz
+   [[0 0 0] [0 1 1] [0 2 2]]
+   [[0 0 2] [0 1 1] [0 2 0]]
+   
+   [[1 0 0] [1 1 1] [1 2 2]]
+   [[1 0 2] [1 1 1] [1 2 0]]
+   
+   [[2 0 0] [2 1 1] [2 2 2]]
+   [[2 0 2] [2 1 1] [2 2 0]]
+   
+   ; diagonals-yz
+   [[0 0 0] [1 0 1] [2 0 2]]
+   [[0 0 2] [1 0 1] [2 0 0]]
+   
+   [[0 1 0] [1 1 1] [2 1 2]]
+   [[0 1 2] [1 1 1] [2 1 0]]
+   
+   [[0 2 0] [1 2 1] [2 2 2]]
+   [[0 2 2] [1 2 1] [2 2 0]]
+   
+   ; diagonals-xyz
+   [[0 0 0] [1 1 1] [2 2 2]]
+   [[0 2 2] [1 1 1] [2 0 0]]
+   [[0 0 2] [1 1 1] [2 2 0]]
+   [[2 0 2] [1 1 1] [0 2 0]]
+   
+   ])
 
 (defn create-game-board
+  "Creates the 3x3x3 Tic-Tac-Toe game board."
   []
-  [[[nil nil nil] [nil nil nil] [nil nil nil]]
-   [[nil nil nil] [nil nil nil] [nil nil nil]]
+  [[[nil nil nil] ["x" "o" nil] [nil "o" nil]]
+   [["x" nil nil] [nil "x" nil] [nil nil "x"]]
    [[nil nil nil] [nil nil nil] [nil nil nil]]]
   )
 
+(def board (create-game-board)) ; for testing purposes only!
+
 (defn create-player
+  "Creates a Tic-Tac-Toe computer player."
   [char] ; strategy to be implemented --> this is what we will "evolve"
   {:token char
    :strategy "to be implemented"
@@ -24,6 +103,7 @@
    :ties 0})
 
 (defn new-game
+  "Initializes a new Tic-Tac-Toe game."
   []
   {:board (create-game-board)
    :player1 (create-player "O")
@@ -32,6 +112,10 @@
 (defn get-value-at-index
   [board index]
   (get-in board index))
+
+(defn first-turn?
+  [board]
+  (= [nil] (distinct board)))
 
 (defn valid-spot?
   [board index]
@@ -47,14 +131,34 @@
     (assoc board index (get player :token))
     board))
 
-(defn winner?
-  "To be implemented..."
-  [board]
-  false)
+(defn winner-exists? 
+  [board indexes]
+  (apply = (map #(get-value-at-index board %) indexes)))
+
+(defn winner-on-indexes 
+  [board indexes]
+  (if (winner-exists? board indexes)
+    (get-value-at-index board (first indexes))
+    nil))
+
+(defn winner
+  "Returns the winner of the game, or nil if there is no winner yet.
+   TENTATIVE VERSION:
+   I need to change this function to return the PLAYER, and not the winning token!"
+  [board] 
+  (some #(winner-on-indexes board %) all-winning-indexes))
+
+; DO I NEED TO PASS OVER BOARD AS ARGUMENT OR GAME? 
+; ISNT GAME MORE SUITABLE AS AN ARG IF WE HAVE MULTIPLE GAMES GOING ON SIMULATANEOUSLY?
 
 (defn game-over?
+  "Determines whether or not the game is over yet."
   [board]
-  (or (all-spots-taken? board) (winner? board)))
+  (or 
+    (all-spots-taken? board) 
+    (if (not (= nil (winner board)))
+      true
+      false)))
 
 ; ================================ Strategy Functions ================================
 
