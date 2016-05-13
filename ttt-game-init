@@ -96,7 +96,7 @@
 
 (defn create-player
   "Creates a Tic-Tac-Toe computer player."
-  [char] ; strategy to be implemented --> this is what we will "evolve"
+  [char]
   {:token char
    :strategy (make-program-into-fn (generate-prog 3))
    :wins 0
@@ -158,8 +158,8 @@
   (if (valid-spot? index)
     (reset! board (assoc-in @board index (get player :token)))
     (reset! board (assoc-in @board (choose-random-spot) (get player :token))))
-  (get-other-player) ; change the player
-  @board) ; return the board
+  (get-other-player)
+  @board) 
 
 (defn winner-exists? 
   [indexes]
@@ -185,9 +185,7 @@
   []
   (or 
     (all-spots-taken?) 
-    (if (not (= nil (winner)))
-      true
-      false)))
+    (not (= nil (winner)))))
 
 ; ================================ Functions Set ================================
 
@@ -301,3 +299,5 @@
             (take-turn (next-move-fn) current)
             other
             current))))))
+
+(play-game (get-new-game))
