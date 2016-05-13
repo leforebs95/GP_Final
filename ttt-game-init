@@ -213,7 +213,45 @@
          (and
            (not (= (get player :token) (get-value-at-index board index2)))
            (not (= nil (get-value-at-index board index2)))))))
+           
+;This is more what I was thinking of for our function set. Of course nill will only be used
+;for the if-empty. For the others I need to know what value get-value would return if the index
+;is X or O. 5 functions should be enough for the players to work with.
+(defn if-x-at-index
+  [vector1 vector2 vector3]
+  (if (= (get-value-at-index vector1) nill)
+    vector2
+    vector3)
+  )
 
+(defn if-o-at-index
+  [vector1 vector2 vector3]
+  (if (= (get-value-at-index vector1) nill)
+    vector2
+    vector3)
+  )
+
+(defn if-index-empty
+  [vector1 vector2 vector3]
+  (if (= (get-value-at-index vector1) nill)
+    vector2
+    vector3)
+  )
+
+(defn if-2-x-index
+  [vector1 vector2 vector3 vector4]
+  (if (and (= (get-value-at-index vector1) nill) 
+           (= (get-value-at-index vector2) nill))
+    vector3
+    vector4))
+
+(defn if-2-o-index
+  [vector1 vector2 vector3 vector4]
+  (if (and (= (get-value-at-index vector1) nill) 
+           (= (get-value-at-index vector2) nill))
+    vector3
+    vector4))
+    
 (def function-set
   (list if-mine-at-index if-theirs-at-index if-mine-at-indexes if-theirs-at-indexes))
 
