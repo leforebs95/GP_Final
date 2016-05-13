@@ -238,14 +238,14 @@
     vector3)
   )
 
-(defn if-2-x-index
+(defn if-2-x-indexes
   [vector1 vector2 vector3 vector4]
   (if (and (= (get-value-at-index vector1) "x") 
            (= (get-value-at-index vector2) "x"))
     vector3
     vector4))
 
-(defn if-2-o-index
+(defn if-2-o-indexes
   [vector1 vector2 vector3 vector4]
   (if (and (= (get-value-at-index vector1) "o") 
            (= (get-value-at-index vector2) "o"))
@@ -254,6 +254,9 @@
     
 (def function-set
   (list if-mine-at-index if-theirs-at-index if-mine-at-indexes if-theirs-at-indexes))
+  
+(def function-set
+  ( '(if-x-at-index if-o-at-index if-empty-at-index if-2-x-indexes if-2-o-indexes)))
 
 (defn select-terminal
   "Selects a random terminal for the program -- the terminal is any index value."
