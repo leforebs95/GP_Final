@@ -219,14 +219,14 @@
 ;is X or O. 5 functions should be enough for the players to work with.
 (defn if-x-at-index
   [vector1 vector2 vector3]
-  (if (= (get-value-at-index vector1) nill)
+  (if (= (get-value-at-index vector1) "x")
     vector2
     vector3)
   )
 
 (defn if-o-at-index
   [vector1 vector2 vector3]
-  (if (= (get-value-at-index vector1) nill)
+  (if (= (get-value-at-index vector1) "o")
     vector2
     vector3)
   )
@@ -240,15 +240,15 @@
 
 (defn if-2-x-index
   [vector1 vector2 vector3 vector4]
-  (if (and (= (get-value-at-index vector1) nill) 
-           (= (get-value-at-index vector2) nill))
+  (if (and (= (get-value-at-index vector1) "x") 
+           (= (get-value-at-index vector2) "x"))
     vector3
     vector4))
 
 (defn if-2-o-index
   [vector1 vector2 vector3 vector4]
-  (if (and (= (get-value-at-index vector1) nill) 
-           (= (get-value-at-index vector2) nill))
+  (if (and (= (get-value-at-index vector1) "o") 
+           (= (get-value-at-index vector2) "o"))
     vector3
     vector4))
     
