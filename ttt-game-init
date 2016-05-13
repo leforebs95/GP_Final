@@ -86,85 +86,106 @@
 (defn create-game-board
   "Creates the 3x3x3 Tic-Tac-Toe game board."
   []
-  [[["O" nil nil] ["x" "o" nil] [nil "o" nil]]
-   [["x" nil nil] [nil "x" nil] [nil nil "x"]]
+  [[[nil nil nil] [nil nil nil] [nil nil nil]]
+   [[nil nil nil] [nil nil nil] [nil nil nil]]
    [[nil nil nil] [nil nil nil] [nil nil nil]]]
   )
 
-(def board (create-game-board)) ; for testing purposes only!
+(def board
+  (atom (create-game-board)))
 
 (defn create-player
   "Creates a Tic-Tac-Toe computer player."
   [char] ; strategy to be implemented --> this is what we will "evolve"
   {:token char
-   :strategy "to be implemented"
+   :strategy (make-program-into-fn (generate-prog 3))
    :wins 0
-   :losses 0
-   :ties 0})
+   :losses 0})
 
 (defn new-game
   "Initializes a new Tic-Tac-Toe game."
   []
-  {:board (create-game-board)
-   :player1 (create-player "O")
-   :player2 (create-player "X")})
+  (reset! board (create-game-board))
+  {:board @board
+   :player1 (create-player "X")
+   :player2 (create-player "O")})
+
+(def game
+  (atom (new-game)))
+
+(def player
+  (atom (@game :player1)))
+
+(defn get-new-game
+  []
+  (let [game-init (new-game)]
+    (reset! game game-init)
+    (reset! player (game-init :player1))
+    game-init))
+
+(defn get-other-player
+  []
+  (if (= @player (@game :player1))
+    (reset! player (@game :player2))
+    (reset! player (@game :player1))))
 
 (defn get-value-at-index
-  [board index]
-  (get-in board index))
+  [index]
+  (get-in @board index))
 
 (defn first-turn?
-  [board]
-  (= [nil] (distinct board)))
+  []
+  (= [nil] (distinct @board)))
 
 (defn valid-spot?
-  [board index]
-  (= nil (get-value-at-index board index)))
+  [index]
+  (= nil (get-value-at-index index)))
 
 (defn all-spots-taken?
-  [board]
-  (empty? (filter (fn [index] (= nil index)) (flatten board))))
+  []
+  (empty? (filter (fn [index] (= nil index)) (flatten @board))))
 
 (defn choose-random-spot
   "Returns an index representing a random, unoccupied spot on the board."
-  [board]
-  (let [index (rand-nth indexes)]
-    (if (= nil (get-value-at-index board index))
+  []
+  (loop [index (rand-nth indexes)]
+    (if (= nil (get-value-at-index index))
       index
       (recur (rand-nth indexes)))))
 
 (defn take-turn
-  [board index player]
-  (if (valid-spot? board index)
-    (assoc board index (get player :token))
-    (assoc board (choose-random-spot board) (get player :token))))
+  [index player]
+  (if (valid-spot? index)
+    (reset! board (assoc-in @board index (get player :token)))
+    (reset! board (assoc-in @board (choose-random-spot) (get player :token))))
+  (get-other-player) ; change the player
+  @board) ; return the board
 
 (defn winner-exists? 
-  [board indexes]
-  (apply = (map #(get-value-at-index board %) indexes)))
+  [indexes]
+  (apply = (map #(get-value-at-index %) indexes)))
 
 (defn winner-on-indexes 
-  [board indexes]
-  (if (winner-exists? board indexes)
-    (get-value-at-index board (first indexes))
+  [indexes]
+  (if (winner-exists? indexes)
+    (get-value-at-index (first indexes))
     nil))
 
 (defn winner
-  "Returns the winner of the game, or nil if there is no winner yet.
-   TENTATIVE VERSION:
-   I need to change this function to return the PLAYER, and not the winning token!"
-  [board] 
-  (some #(winner-on-indexes board %) all-winning-indexes))
-
-; DO I NEED TO PASS OVER BOARD AS ARGUMENT OR GAME? 
-; ISNT GAME MORE SUITABLE AS AN ARG IF WE HAVE MULTIPLE GAMES GOING ON SIMULATANEOUSLY?
+  "Returns the winner of the game, or nil if there is no winner yet."
+  [] 
+  (let [winning-token (some #(winner-on-indexes %) all-winning-indexes)]
+    (cond
+    (= winning-token ((@game :player1) :token)) "Player 1"
+    (= winning-token ((@game :player2) :token)) "Player 2"
+    :else nil)))
 
 (defn game-over?
   "Determines whether or not the game is over yet."
-  [board]
+  []
   (or 
-    (all-spots-taken? board) 
-    (if (not (= nil (winner board)))
+    (all-spots-taken?) 
+    (if (not (= nil (winner)))
       true
       false)))
 
@@ -174,7 +195,7 @@
   "Takes a GP program represented as a list, with input index,
    and transforms it into a function that can be called on an input."
   [program]
-  (eval (list 'fn '[index board player] program)))
+  (eval (list 'fn '[] program)))
 
 (defn program-size
   "Finds the size of the program, i.e. number of nodes in its tree."
@@ -187,76 +208,52 @@
   '{if-mine-at-index 3
     if-theirs-at-index 3
     if-mine-at-indexes 4
-    if-theirs-at-indexes 4})
-    
-; Is this the approach you are taking or is your approach different? 
-; This is what I could come up with. Once you've come up with a set we could compare and see which one to adopt.
+    if-theirs-at-indexes 4
+    if-index-empty 2})
 
-(def if-mine-at-index
-  '(if (= (get player :token) (get-value-at-index board index))))
+(defn if-mine-at-index
+  [index1 index2 index3]
+  (if (= (get @player :token) (get-value-at-index index1))
+    index2
+    index3))
 
-(def if-theirs-at-index
-  '(if (and
-         (not (= (get player :token) (get-value-at-index board index)))
-         (not (= nil (get-value-at-index board index))))))
+(defn if-theirs-at-index
+  [index1 index2 index3]
+  (if (and
+         (not (= (get @player :token) (get-value-at-index index1)))
+         (not (= nil (get-value-at-index index1))))
+    index2
+    index3))
 
-(def if-mine-at-indexes
-  '(if (and 
-         (= (get player :token) (get-value-at-index board index1))
-         (= (get player :token) (get-value-at-index board index2)))))
+(defn if-mine-at-indexes
+  [index1 index2 index3 index4]
+  (if (and 
+         (= (get @player :token) (get-value-at-index index1))
+         (= (get @player :token) (get-value-at-index index2)))
+    index3
+    index4))
 
-(def if-theirs-at-indexes
-  '(if (and  
+(defn if-theirs-at-indexes
+  [index1 index2 index3 index4]
+  (if (and  
          (and
-           (not (= (get player :token) (get-value-at-index board index1)))
-           (not (= nil (get-value-at-index board index1))))
+           (not (= (get @player :token) (get-value-at-index index1)))
+           (not (= nil (get-value-at-index index1))))
          (and
-           (not (= (get player :token) (get-value-at-index board index2)))
-           (not (= nil (get-value-at-index board index2)))))))
-           
-;This is more what I was thinking of for our function set. Of course nill will only be used
-;for the if-empty. For the others I need to know what value get-value would return if the index
-;is X or O. 5 functions should be enough for the players to work with.
-(defn if-x-at-index
-  [vector1 vector2 vector3]
-  (if (= (get-value-at-index vector1) "x")
-    vector2
-    vector3)
-  )
-
-(defn if-o-at-index
-  [vector1 vector2 vector3]
-  (if (= (get-value-at-index vector1) "o")
-    vector2
-    vector3)
-  )
+           (not (= (get @player :token) (get-value-at-index index2)))
+           (not (= nil (get-value-at-index index2)))))
+    index3
+    index4))
 
 (defn if-index-empty
-  [vector1 vector2 vector3]
-  (if (= (get-value-at-index vector1) nill)
-    vector2
-    vector3)
-  )
+  [index1 index2]
+  (if (= nil (get-value-at-index index1))
+    index1
+    index2))
 
-(defn if-2-x-indexes
-  [vector1 vector2 vector3 vector4]
-  (if (and (= (get-value-at-index vector1) "x") 
-           (= (get-value-at-index vector2) "x"))
-    vector3
-    vector4))
-
-(defn if-2-o-indexes
-  [vector1 vector2 vector3 vector4]
-  (if (and (= (get-value-at-index vector1) "o") 
-           (= (get-value-at-index vector2) "o"))
-    vector3
-    vector4))
-    
 (def function-set
-  (list if-mine-at-index if-theirs-at-index if-mine-at-indexes if-theirs-at-indexes))
-  
-(def function-set
-  ( '(if-x-at-index if-o-at-index if-empty-at-index if-2-x-indexes if-2-o-indexes)))
+  (list 'if-mine-at-index 'if-theirs-at-index 'if-mine-at-indexes 'if-theirs-at-indexes
+        'if-index-empty))
 
 (defn select-terminal
   "Selects a random terminal for the program -- the terminal is any index value."
@@ -268,15 +265,39 @@
   []
   (rand-nth function-set))
 
-; generate-prog does not work for some reason. have to figure out whats up.
 (defn generate-prog
   "Generates a program of the given depth, using random functions and terminals."
   [depth]
   (if (zero? depth)
     (select-terminal)
     (let [func (select-fun)]
-      (list func ; select a random function and recursively call generate-prog to
-                 ; fill out the subchildren of the node
-            (repeatedly 3 (generate-prog (dec depth)))))))
+      (conj ; select a random function and recursively call generate-prog to
+            ; fill out the subchildren of the node
+            (repeatedly (get instruction-set func)
+                        #(generate-prog (dec depth)))
+            func))))
 
-(generate-prog 1)
+(defn generate-pop
+  "Generates a population of players of the given population size.
+   Pre-requisite: pop-size should be an even number."
+  [pop-size]
+  (if (even? pop-size)
+    (concat
+      (repeatedly (/ pop-size 2) #(create-player "X"))
+      (repeatedly (/ pop-size 2) #(create-player "O")))
+    (println "Error: pop-size should be an even integer.")))
+
+(defn play-game
+  [game]
+  (loop [game-board @board
+         current (get game :player1)
+         other (get game :player2)]
+    (let [next-move-fn (get current :strategy)]
+      (if (game-over?)
+        (winner)
+        (do
+          (println (str game-board))
+          (recur
+            (take-turn (next-move-fn) current)
+            other
+            current))))))
