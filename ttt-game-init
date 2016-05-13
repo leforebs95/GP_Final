@@ -1,9 +1,33 @@
 (ns tic-tac-toe.core)
 
+(defn make-program-into-fn
+  "Takes a GP program represented as a list, with input index,
+   and transforms it into a function that can be called on an input."
+  [program]
+  (eval (list 'fn '[] program)))
+
+(defn program-size
+  "Finds the size of the program, i.e. number of nodes in its tree."
+  [prog]
+  (if (not (seq? prog))
+    1
+    (count (flatten prog))))
+
+(def game
+  (atom nil))
+
+(def player
+  (atom nil))
+
 (def indexes ; this is the terminal set
   [[0 0 0] [0 0 1] [0 0 2] [0 1 0] [0 1 1] [0 1 2] [0 2 0] [0 2 1] [0 2 2]
    [1 0 0] [1 0 1] [1 0 2] [1 1 0] [1 1 1] [1 1 2] [1 2 0] [1 2 1] [1 2 2]
    [2 0 0] [2 0 1] [2 0 2] [2 1 0] [2 1 1] [2 1 2] [2 2 0] [2 2 1] [2 2 2]])
+
+(defn select-terminal
+  "Selects a random terminal for the program -- the terminal is any index value."
+  []
+  (rand-nth indexes))
 
 (def all-winning-indexes [
    ; y-axis                       
@@ -94,41 +118,6 @@
 (def board
   (atom (create-game-board)))
 
-(defn create-player
-  "Creates a Tic-Tac-Toe computer player."
-  [char]
-  {:token char
-   :strategy (make-program-into-fn (generate-prog 3))
-   :wins 0
-   :losses 0})
-
-(defn new-game
-  "Initializes a new Tic-Tac-Toe game."
-  []
-  (reset! board (create-game-board))
-  {:board @board
-   :player1 (create-player "X")
-   :player2 (create-player "O")})
-
-(def game
-  (atom (new-game)))
-
-(def player
-  (atom (@game :player1)))
-
-(defn get-new-game
-  []
-  (let [game-init (new-game)]
-    (reset! game game-init)
-    (reset! player (game-init :player1))
-    game-init))
-
-(defn get-other-player
-  []
-  (if (= @player (@game :player1))
-    (reset! player (@game :player2))
-    (reset! player (@game :player1))))
-
 (defn get-value-at-index
   [index]
   (get-in @board index))
@@ -152,55 +141,6 @@
     (if (= nil (get-value-at-index index))
       index
       (recur (rand-nth indexes)))))
-
-(defn take-turn
-  [index player]
-  (if (valid-spot? index)
-    (reset! board (assoc-in @board index (get player :token)))
-    (reset! board (assoc-in @board (choose-random-spot) (get player :token))))
-  (get-other-player)
-  @board) 
-
-(defn winner-exists? 
-  [indexes]
-  (apply = (map #(get-value-at-index %) indexes)))
-
-(defn winner-on-indexes 
-  [indexes]
-  (if (winner-exists? indexes)
-    (get-value-at-index (first indexes))
-    nil))
-
-(defn winner
-  "Returns the winner of the game, or nil if there is no winner yet."
-  [] 
-  (let [winning-token (some #(winner-on-indexes %) all-winning-indexes)]
-    (cond
-    (= winning-token ((@game :player1) :token)) "Player 1"
-    (= winning-token ((@game :player2) :token)) "Player 2"
-    :else nil)))
-
-(defn game-over?
-  "Determines whether or not the game is over yet."
-  []
-  (or 
-    (all-spots-taken?) 
-    (not (= nil (winner)))))
-
-; ================================ Functions Set ================================
-
-(defn make-program-into-fn
-  "Takes a GP program represented as a list, with input index,
-   and transforms it into a function that can be called on an input."
-  [program]
-  (eval (list 'fn '[] program)))
-
-(defn program-size
-  "Finds the size of the program, i.e. number of nodes in its tree."
-  [prog]
-  (if (not (seq? prog))
-    1
-    (count (flatten prog))))
 
 (def instruction-set
   '{if-mine-at-index 3
@@ -253,11 +193,6 @@
   (list 'if-mine-at-index 'if-theirs-at-index 'if-mine-at-indexes 'if-theirs-at-indexes
         'if-index-empty))
 
-(defn select-terminal
-  "Selects a random terminal for the program -- the terminal is any index value."
-  []
-  (rand-nth indexes))
-
 (defn select-fun
   "Selects a random function for the program (from the function set)."
   []
@@ -275,21 +210,69 @@
                         #(generate-prog (dec depth)))
             func))))
 
-(defn generate-pop
-  "Generates a population of players of the given population size.
-   Pre-requisite: pop-size should be an even number."
-  [pop-size]
-  (if (even? pop-size)
-    (concat
-      (repeatedly (/ pop-size 2) #(create-player "X"))
-      (repeatedly (/ pop-size 2) #(create-player "O")))
-    (println "Error: pop-size should be an even integer.")))
+(defn create-player
+  "Creates a Tic-Tac-Toe computer player."
+  [char]
+  {:token char
+   :strategy (make-program-into-fn (generate-prog 3))
+   :wins 0
+   :losses 0})
+
+(defn new-game
+  "Initializes a new Tic-Tac-Toe game."
+  []
+  (reset! board (create-game-board))
+  {:board @board
+   :player1 (create-player "X")
+   :player2 (create-player "O")})
+
+(defn get-other-player
+  []
+  (if (= @player (@game :player1))
+    (reset! player (@game :player2))
+    (reset! player (@game :player1))))
+
+(defn take-turn
+  [index player]
+  (if (valid-spot? index)
+    (reset! board (assoc-in @board index (get player :token)))
+    (reset! board (assoc-in @board (choose-random-spot) (get player :token))))
+  (get-other-player)
+  @board) 
+
+(defn winner-exists? 
+  [indexes]
+  (apply = (map #(get-value-at-index %) indexes)))
+
+(defn winner-on-indexes 
+  [indexes]
+  (if (winner-exists? indexes)
+    (get-value-at-index (first indexes))
+    nil))
+
+(defn winner
+  "Returns the winner of the game, or nil if there is no winner yet."
+  [] 
+  (let [winning-token (some #(winner-on-indexes %) all-winning-indexes)]
+    (cond
+    (= winning-token ((@game :player1) :token)) "Player 1"
+    (= winning-token ((@game :player2) :token)) "Player 2"
+    :else nil)))
+
+(defn game-over?
+  "Determines whether or not the game is over yet."
+  []
+  (or 
+    (all-spots-taken?) 
+    (not (= nil (winner)))))
 
 (defn play-game
-  [game]
+  [the-game]
+  (reset! game the-game)
+  (reset! player (the-game :player1))
   (loop [game-board @board
-         current (get game :player1)
-         other (get game :player2)]
+         current (get the-game :player1)
+         other (get the-game :player2)]
     (let [next-move-fn (get current :strategy)]
       (if (game-over?)
         (winner)
@@ -300,4 +283,58 @@
             other
             current))))))
 
-(play-game (get-new-game))
+(defn generate-pop
+  "Generates a population of players of the given population size.
+   Pre-requisite: pop-size should be an even number."
+  [pop-size]
+  (if (even? pop-size)
+    (concat
+      (repeatedly (/ pop-size 2) #(create-player "X"))
+      (repeatedly (/ pop-size 2) #(create-player "O")))
+    (println "Error: pop-size should be an even integer.")))
+
+(defn select-random-subtree
+  "Given a program, selects a random subtree and returns it."
+  ([prog]
+    (select-random-subtree prog (rand-int (program-size prog))))
+  ([prog subtree-index]
+    (cond
+      (not (seq? prog)) prog
+      (and (zero? subtree-index)
+           (some #{(first prog)} (keys instruction-set))) prog
+      (< subtree-index (program-size (first prog))) (recur (first prog)
+                                                           subtree-index)
+      :else (recur (rest prog)
+                   (- subtree-index (program-size (first prog)))))))
+
+(defn replace-random-subtree
+  "Given a program and a replacement-subtree, replace a random node
+   in the program with the replacement-subtree."
+  ([prog replacement-subtree]
+      (replace-random-subtree prog replacement-subtree (rand-int (program-size prog))))
+  ([prog replacement-subtree subtree-index]
+    (cond
+      (not (seq? prog)) replacement-subtree
+      (zero? subtree-index) replacement-subtree
+      :else (map (fn [element start-index]
+                   (if (<= start-index
+                           subtree-index
+                           (+ start-index -1 (program-size element)))
+                     (replace-random-subtree element
+                                             replacement-subtree
+                                             (- subtree-index start-index))
+                     element))
+                 prog
+                 (cons 0 (reductions + (map program-size prog)))))))
+
+(defn mutate
+  "Replaces a random node in the program by a random program of depth between 0 and 
+   2 (inclusive)."
+  [prog]
+  (replace-random-subtree prog (generate-prog (rand-int 3))))
+
+(defn crossover
+  "Replaces a random node in the program by a random node from another program."
+ [prog1 prog2]
+ (replace-random-subtree prog1 (select-random-subtree prog2)))
+
