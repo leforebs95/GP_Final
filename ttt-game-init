@@ -112,8 +112,7 @@
   []
   [[[nil nil nil] [nil nil nil] [nil nil nil]]
    [[nil nil nil] [nil nil nil] [nil nil nil]]
-   [[nil nil nil] [nil nil nil] [nil nil nil]]]
-  )
+   [[nil nil nil] [nil nil nil] [nil nil nil]]])
 
 (def board
   (atom (create-game-board)))
@@ -213,30 +212,30 @@
 (defn create-player
   "Creates a Tic-Tac-Toe computer player."
   [char]
-  {:token char
-   :strategy (make-program-into-fn (generate-prog 3))
-   :wins 0
-   :losses 0})
+  (atom {:token char
+         :strategy (make-program-into-fn (generate-prog 3))
+         :wins 0
+         :losses 0}))
 
 (defn new-game
   "Initializes a new Tic-Tac-Toe game."
-  []
+  [player1 player2]
   (reset! board (create-game-board))
   {:board @board
-   :player1 (create-player "X")
-   :player2 (create-player "O")})
+   :player1 player1
+   :player2 player2})
 
 (defn get-other-player
   []
-  (if (= @player (@game :player1))
+  (if (= player (@game :player1)) 
     (reset! player (@game :player2))
     (reset! player (@game :player1))))
 
 (defn take-turn
-  [index player]
+  [index the-player]
   (if (valid-spot? index)
-    (reset! board (assoc-in @board index (get player :token)))
-    (reset! board (assoc-in @board (choose-random-spot) (get player :token))))
+    (reset! board (assoc-in @board index (get @the-player :token)))
+    (reset! board (assoc-in @board (choose-random-spot) (get @the-player :token))))
   (get-other-player)
   @board) 
 
@@ -255,8 +254,8 @@
   [] 
   (let [winning-token (some #(winner-on-indexes %) all-winning-indexes)]
     (cond
-    (= winning-token ((@game :player1) :token)) "Player 1"
-    (= winning-token ((@game :player2) :token)) "Player 2"
+    (= winning-token (@(@game :player1) :token)) "Player 1"
+    (= winning-token (@(@game :player2) :token)) "Player 2"
     :else nil)))
 
 (defn game-over?
@@ -266,6 +265,11 @@
     (all-spots-taken?) 
     (not (= nil (winner)))))
 
+(defn update-wins-losses
+  [winner loser]
+  (reset! winner (assoc @winner :wins (inc (@winner :wins))))
+  (reset! loser (assoc @loser :losses (inc (@loser :losses)))))
+
 (defn play-game
   [the-game]
   (reset! game the-game)
@@ -273,25 +277,24 @@
   (loop [game-board @board
          current (get the-game :player1)
          other (get the-game :player2)]
-    (let [next-move-fn (get current :strategy)]
+    (let [next-move-fn (get @current :strategy)]
       (if (game-over?)
-        (winner)
+        (let [winning-player (winner)
+              player1 (get the-game :player1)
+              player2 (get the-game :player2)]
+          (if (= winning-player "Player 1")
+            (update-wins-losses player1 player2)
+            (update-wins-losses player2 player1))
+          (println @player1)
+          (println @player2)
+          winning-player)
         (do
           (println (str game-board))
           (recur
             (take-turn (next-move-fn) current)
             other
             current))))))
-
-(defn generate-pop
-  "Generates a population of players of the given population size.
-   Pre-requisite: pop-size should be an even number."
-  [pop-size]
-  (if (even? pop-size)
-    (concat
-      (repeatedly (/ pop-size 2) #(create-player "X"))
-      (repeatedly (/ pop-size 2) #(create-player "O")))
-    (println "Error: pop-size should be an even integer.")))
+ 
 
 (defn select-random-subtree
   "Given a program, selects a random subtree and returns it."
@@ -337,4 +340,25 @@
   "Replaces a random node in the program by a random node from another program."
  [prog1 prog2]
  (replace-random-subtree prog1 (select-random-subtree prog2)))
+
+(defn eval-fitness
+  "Evaluates the fitness of an individual (the greater, the better). 
+   A value of 0 indicates that the individual has not won any games yet."
+  [individual]
+  (let [wins (get @individual :wins)
+        losses (get @individual :losses)]
+    (if (= (+ wins losses) 0)
+      0
+      (/ wins (+ wins losses)))))
+
+(defn generate-pop
+  "Generates a population of players of the given population size.
+   Pre-requisite: pop-size should be an even number."
+  [pop-size]
+  (if (even? pop-size)
+    (concat
+      (repeatedly (/ pop-size 2) #(create-player "X"))
+      (repeatedly (/ pop-size 2) #(create-player "O")))
+    (println "Error: pop-size should be an even integer.")))
+
 
