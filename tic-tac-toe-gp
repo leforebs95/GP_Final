@@ -9,12 +9,18 @@
 (def line-separator
   "-------------------------------------------------------------------------")
 
+(defn get-vec-count
+  [program]
+  (let [flat-prog (flatten program)]
+    (/ (count (filter integer? flat-prog)) 3)))
+
 (defn program-size
   "Finds the size of the program, i.e. number of nodes in its tree."
   [prog]
   (if (not (seq? prog))
     1
-    (count (flatten prog))))
+    (let [size (count (flatten prog))]
+      (- size (* (get-vec-count prog) 2)))))
 
 (def game
   (atom nil))
@@ -330,6 +336,27 @@
                  prog
                  (cons 0 (reductions + (map program-size prog)))))))
 
+(defn select-node
+  [prog]
+  (loop [node (select-random-subtree prog)]
+    (if (not= (type node) clojure.lang.PersistentVector)
+      node
+      (recur (select-random-subtree prog)))))
+
+(defn select-leaf
+  [prog]
+  (loop [node (select-random-subtree prog)]
+    (if (= (type node) clojure.lang.PersistentVector)
+      node
+      (recur (select-random-subtree prog)))))
+
+(defn koza-90-10
+  [prog]
+  (let [prob (rand)]
+    (if (< prob 0.9)
+      (select-node prog)
+      (select-leaf prog))))
+
 (defn mutate
   "Replaces a random node in the program by a random program of depth between 0 and 
    2 (inclusive)."
@@ -347,10 +374,11 @@
    A value of 1 indicates that the individual has won all the games."
   [individual]
   (let [wins (get @individual :wins)
-        losses (get @individual :losses)]
+        losses (get @individual :losses)
+        prog-size (program-size (get @individual :strategy))]
     (if (= (+ wins losses) 0)
-      0
-      (/ wins (+ wins losses)))))
+      (float (+ 0 prog-size))
+      (float (+ (* 10000 (/ wins (+ wins losses))) prog-size)))))
 
 (defn pair-individuals-errors
   "A helper function for sort-population.
@@ -385,8 +413,22 @@
     ; others in this tournament (assuming that the population is already sorted).
     (nth population index-value)))
 
-(def population
-  (generate-pop 10))
+
+(defn fitness-proportionate-selection
+  "Selects an individual from the population using fitness-proportionate (roulette wheel)
+   selection."
+  ([population]
+    (let [individuals-fitnesses (pair-individuals-errors population)]
+      (let [fitness-sum (reduce + (map second individuals-fitnesses))
+            stop-value (* (rand) fitness-sum)]
+        (loop [pairs individuals-fitnesses
+               counter 0]
+          (let [[individual fitness] (first pairs)]
+            (if (> (+ counter fitness) stop-value)
+              (do
+                (println (+ counter fitness) stop-value)
+                individual)
+              (recur (rest pairs) (+ counter fitness)))))))))
 
 (defn play-against-each-other
   [population]
@@ -403,9 +445,6 @@
             (rand-nth x-players)
             (inc counter)))))))
 
-population
-(play-against-each-other population)
-
 (defn evolve
   "Evolves the population of programs."
   [population-size max-generations mutation-ratio crossover-ratio]
@@ -418,13 +457,14 @@ population
           best-individual-fitness (eval-fitness best-individual)]
         (println line-separator)
         (println "Generation number:" generation-number)
-        (println "Best player so far:" best-individual)
+        (println "Best player so far:" @best-individual)
         (println "Best fitness so far:" best-individual-fitness)
         (cond 
-          (= generation-number max-generations) (println line-separator
-                                                         "\nEvolution complete. \nBest player so far:\n"
-                                                         @best-individual
-                                                         "\nPlayer Fitness:" best-individual-fitness)
+          (= generation-number max-generations) 
+              (println line-separator
+                       "\nEvolution complete. \nBest player so far:\n"
+                       @best-individual
+                       "\nPlayer Fitness:" best-individual-fitness)
           :else (do
                   (play-against-each-other population)
                   (recur
@@ -435,14 +475,17 @@ population
                                                        ; that acts as a probability to decide
                                                        ; how to genetically vary the programs
                           (cond
-                            (< genetic-operator mutation-ratio) (let [parent (tournament-selection population 3)
-                                                                      strategy (get @parent :strategy)]
-                                                                  (atom (reset! parent (assoc @parent :strategy (mutate strategy))))) 
-                            (< genetic-operator (+ mutation-ratio crossover-ratio)) (let [parent1 (tournament-selection population 3)
-                                                                                          parent2 (tournament-selection population 3)
-                                                                                          strategy1 (get @parent1 :strategy)
-                                                                                          strategy2 (get @parent2 :strategy)]
-                                                                                      (atom (reset! parent1 (assoc @parent1 :strategy (crossover strategy1 strategy2)))))
+                            (< genetic-operator mutation-ratio) ; mutation
+                                (let [parent (tournament-selection population 3)
+                                      strategy (get @parent :strategy)]
+                                  (atom (reset! parent (assoc @parent :strategy (mutate strategy))))) 
+                            (< genetic-operator (+ mutation-ratio crossover-ratio)) ; crossover
+                                (let [parent1 (tournament-selection population 3)
+                                      parent2 (tournament-selection population 3)
+                                      strategy1 (get @parent1 :strategy)
+                                      strategy2 (get @parent2 :strategy)]
+                                  (atom (reset! parent1 (assoc @parent1 :strategy (crossover strategy1 strategy2)))))
                             :else (tournament-selection population 3))))))))))))
 
-(evolve 20 20 0.9 0.1)
+;(evolve 30 10 0.7 0.2)
+        
