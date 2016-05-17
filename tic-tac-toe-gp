@@ -126,6 +126,11 @@
 (def board
   (atom (create-game-board)))
 
+@board
+(get-value-at-index [0 1 0])
+(get-value-at-index [1 1 1])
+(get-value-at-index [2 0 2])
+
 (defn get-value-at-index
   [index]
   (get-in @board index))
@@ -224,9 +229,7 @@
   (atom {:token char
          :strategy strategy
          :wins 0
-         :losses 0
-         :move-count 0
-         :ID (rand-int 10001)}))
+         :losses 0}))
 
 (defn new-game
   "Initializes a new Tic-Tac-Toe game."
@@ -247,7 +250,6 @@
   (if (valid-spot? index)
     (reset! board (assoc-in @board index (get @the-player :token)))
     (reset! board (assoc-in @board (choose-random-spot) (get @the-player :token))))
-  (reset! the-player (assoc @the-player :move-count (inc (get @the-player :move-count))))
   (get-other-player)
   @board) 
 
@@ -302,6 +304,28 @@
           (take-turn (next-move-fn) current)
           other
           current)))))
+
+@board
+
+(defn play-against-each-other
+  [population]
+  (let [x-players (filter #(= (get @% :token) "X") population)
+        o-players (filter #(= (get @% :token) "O") population)]
+    (loop [first-player (rand-nth x-players)
+           second-player (rand-nth o-players)
+           counter 0]
+      (if (< counter (* 10 (count population)))
+        (do
+          (play-game (new-game first-player second-player))
+          (if (even? counter)
+            (recur
+              (rand-nth x-players)
+              (rand-nth o-players)
+              (inc counter))
+            (recur
+              (rand-nth o-players)
+              (rand-nth x-players)
+              (inc counter))))))))
 
 (defn select-random-subtree
   "Given a program, selects a random subtree and returns it."
@@ -375,8 +399,7 @@
    A value of 1 indicates that the individual has won all the games."
   [individual]
   (let [wins (get @individual :wins)
-        losses (get @individual :losses)
-        move-count (get @individual :move-count)]
+        losses (get @individual :losses)]
     (if (= (+ wins losses) 0)
       0
       (/ wins (+ wins losses)))))
@@ -435,26 +458,6 @@
               individual
               (recur (rest pairs) (+ counter fitness)))))))))
 
-(defn play-against-each-other
-  [population]
-  (let [x-players (filter #(= (get @% :token) "X") population)
-        o-players (filter #(= (get @% :token) "O") population)]
-    (loop [first-player (rand-nth x-players)
-           second-player (rand-nth o-players)
-           counter 0]
-      (if (< counter (* 10 (count population)))
-        (do
-          (play-game (new-game first-player second-player))
-          (if (even? counter)
-            (recur
-              (rand-nth x-players)
-              (rand-nth o-players)
-              (inc counter))
-            (recur
-              (rand-nth o-players)
-              (rand-nth x-players)
-              (inc counter))))))))
-
 (defn evolve
   "Evolves the population of programs."
   [population-size max-generations mutation-ratio crossover-ratio]
@@ -463,11 +466,9 @@
     (loop [generation-number 0
            population (sort-population-by-x-and-o (generate-pop population-size))]
       (play-against-each-other population)
-      (println (count (filter #(= (get @% :token) "X") population)))
-      (println (count (filter #(= (get @% :token) "O") population)))
-      (let [best-individual (first (sort-population population)) ; the first individual in the sorted 
-                                               ; population is the best so far
-          best-individual-fitness (eval-fitness best-individual)]
+      (let [sorted-by-error-population (sort-population population)
+            best-individual (first sorted-by-error-population) 
+            best-individual-fitness (eval-fitness best-individual)]
         (println line-separator)
         (println "Generation number:" generation-number)
         (println "Best player so far:" @best-individual)
@@ -485,9 +486,7 @@
                       (let [genetic-operator (rand)
                             token (if (even? i)
                                     "X"
-                                    "O")] ; a random number between 0.0 and 1.0
-                                                     ; that acts as a probability to decide
-                                                     ; how to genetically vary the programs
+                                    "O")]
                         (cond
                           (< genetic-operator mutation-ratio) ; mutation
                               (let [parent (fitness-proportionate-selection population)
@@ -495,11 +494,10 @@
                                 (create-player token (mutate strategy)))
                           (< genetic-operator (+ mutation-ratio crossover-ratio)) ; crossover
                               (let [parent1 (fitness-proportionate-selection population)
-                                    parent2 (fitness-proportionate-selection population)
+                                    parent2 (tournament-selection sorted-by-error-population 5)
                                     strategy1 (get @parent1 :strategy)
                                     strategy2 (get @parent2 :strategy)]
                                 (create-player token (crossover strategy1 strategy2)))
                           :else (fitness-proportionate-selection population)))))))))))
 
-;(evolve 10 10 0.5 0.4)
-        
+(evolve 50 20 0.5 0.4)
