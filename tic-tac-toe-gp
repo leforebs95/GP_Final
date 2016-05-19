@@ -1,3 +1,21 @@
+; GP System implementation by Hammad Ahmad and Brandon Lefore.
+
+; This system tries to evolve a population of players that play a 3-dimentional game of 
+; Tic Tac Toe.
+
+; The major modifications to this system from the originial basic GP implementation, in
+; addition to changing almost every function to implement the 3D Tic Tac Toe, are:
+; Fitness Proportionate Selection and Koza 90/10 selection.
+
+; The system runs for a certain number of maximum generations before outputting the best 
+; player evolved so far. 
+
+; Note that the output player is the best among the population, but it may not necessarily be 
+; good. This is because we run the evolution with a small population size and a relatively 
+; small number of generations (because of the very large number of computations that result
+; in a long running time of the system). Theoretically, if the evolution was run for hours 
+; with a large initial population, the output player should be very good.
+
 (ns tic-tac-toe.core)
 
 (defn make-program-into-fn
@@ -10,8 +28,11 @@
   "-------------------------------------------------------------------------")
 
 (defn get-vec-count
+  "A helper function for program-size. Returns the number of vectors (indexes) in a program."
   [program]
   (let [flat-prog (flatten program)]
+    ; get the number of integers and return that value divided by 3, 
+    ; since each vector has 3 integers
     (/ (count (filter integer? flat-prog)) 3)))
 
 (defn program-size
@@ -22,13 +43,13 @@
     (let [size (count (flatten prog))]
       (- size (* (get-vec-count prog) 2)))))
 
-(def game
+(def game ; an atom that keeps track of the game state
   (atom nil))
 
-(def player
+(def player ; an atom that keeps track of the current player making the turn
   (atom nil))
 
-(def indexes ; this is the terminal set
+(def indexes ; index values on the board -- this is the terminal set.
   [[0 0 0] [0 0 1] [0 0 2] [0 1 0] [0 1 1] [0 1 2] [0 2 0] [0 2 1] [0 2 2]
    [1 0 0] [1 0 1] [1 0 2] [1 1 0] [1 1 1] [1 1 2] [1 2 0] [1 2 1] [1 2 2]
    [2 0 0] [2 0 1] [2 0 2] [2 1 0] [2 1 1] [2 1 2] [2 2 0] [2 2 1] [2 2 2]])
@@ -38,7 +59,7 @@
   []
   (rand-nth indexes))
 
-(def all-winning-indexes [
+(def all-winning-indexes [ ; all possible winning combinations for the game
    ; y-axis                       
    [[0 0 0] [1 0 0] [2 0 0]] 
    [[0 1 0] [1 1 0] [2 1 0]]
@@ -123,29 +144,25 @@
    [[nil nil nil] [nil nil nil] [nil nil nil]]
    [[nil nil nil] [nil nil nil] [nil nil nil]]])
 
-(def board
+(def board ; an atom that keeps track of the game board
   (atom (create-game-board)))
 
-@board
-(get-value-at-index [0 1 0])
-(get-value-at-index [1 1 1])
-(get-value-at-index [2 0 2])
-
 (defn get-value-at-index
+  "Gets the token value in the board at a particular index."
   [index]
   (get-in @board index))
 
-(defn first-turn?
-  []
-  (= [nil] (distinct @board)))
-
 (defn valid-spot?
+  "Determines whether or not the spot is empty (and hence, valid) for a player move."
   [index]
   (= nil (get-value-at-index index)))
 
 (defn all-spots-taken?
+  "Determines whether all the spots on the board are occupied with tokens."
   []
-  (empty? (filter (fn [index] (= nil index)) (flatten @board))))
+  ; for the board to be fully occupied, the sequence returned by calling flatten on board
+  ; should not have any nils in it.
+  (empty? (filter (fn [index] (= nil index)) (flatten @board)))) 
 
 (defn choose-random-spot
   "Returns an index representing a random, unoccupied spot on the board."
@@ -153,9 +170,9 @@
   (loop [index (rand-nth indexes)]
     (if (= nil (get-value-at-index index))
       index
-      (recur (rand-nth indexes)))))
+      (recur (rand-nth indexes))))) ; recurse until a valid spot is found
 
-(def instruction-set
+(def instruction-set ; a map of the function sets and the number of arguments to each function
   '{if-mine-at-index 3
     if-theirs-at-index 3
     if-mine-at-indexes 4
@@ -163,20 +180,24 @@
     if-index-empty 2})
 
 (defn if-mine-at-index
+  "If player token is at index1, return index2, else return index3."
   [index1 index2 index3]
   (if (= (get @player :token) (get-value-at-index index1))
     index2
     index3))
 
 (defn if-theirs-at-index
+  "If opponent token is at index1, return index2, else return index3."
   [index1 index2 index3]
-  (if (and
+  (if (and ; neither player token nor a nil is present at index1 
+           ; this means that the opponent token must be present at index1
          (not (= (get @player :token) (get-value-at-index index1)))
          (not (= nil (get-value-at-index index1))))
     index2
     index3))
 
 (defn if-mine-at-indexes
+  "If player token is at index1 and index2, return index3, else return index4."
   [index1 index2 index3 index4]
   (if (and 
          (= (get @player :token) (get-value-at-index index1))
@@ -185,6 +206,7 @@
     index4))
 
 (defn if-theirs-at-indexes
+  "If opponent token is at index1 and index2, return index3, else return index4."
   [index1 index2 index3 index4]
   (if (and  
          (and
@@ -197,12 +219,13 @@
     index4))
 
 (defn if-index-empty
+  "If index1 is empty, return index1, else return index2."
   [index1 index2]
   (if (= nil (get-value-at-index index1))
     index1
     index2))
 
-(def function-set
+(def function-set ; a list of the functions that make up the function set
   (list 'if-mine-at-index 'if-theirs-at-index 'if-mine-at-indexes 'if-theirs-at-indexes
         'if-index-empty))
 
@@ -217,14 +240,17 @@
   (if (zero? depth)
     (select-terminal)
     (let [func (select-fun)]
-      (conj ; select a random function and recursively call generate-prog to
-            ; fill out the subchildren of the node
-            (repeatedly (get instruction-set func)
+      (conj ; select a random function and recursively call generate-prog n times to
+            ; fill out the subchildren of the node, where n = number of arguments the function
+            ; takes.
+            (repeatedly (get instruction-set func) 
                         #(generate-prog (dec depth)))
             func))))
 
 (defn create-player
-  "Creates a Tic-Tac-Toe computer player."
+  "Creates a Tic-Tac-Toe computer player.
+   Each player is represented as an atom so that the win and loss count of the players can
+   be updated after every game."
   [char strategy]
   (atom {:token char
          :strategy strategy
@@ -234,30 +260,42 @@
 (defn new-game
   "Initializes a new Tic-Tac-Toe game."
   [player1 player2]
-  (reset! board (create-game-board))
+  (reset! board (create-game-board)) ; reset the atom that monitors the board state globally
   {:board @board
    :player1 player1
    :player2 player2})
 
 (defn get-other-player
+  "Resets the player atom to the player not making the turn (i.e., the other player)."
   []
-  (if (= player (@game :player1)) 
-    (reset! player (@game :player2))
-    (reset! player (@game :player1))))
+  (if (= player (get @game :player1)) 
+    (reset! player (get @game :player2))
+    (reset! player (get @game :player1))))
 
 (defn take-turn
+  "Takes a turn by placing the player token on the board, and then changing the current
+   player variable."
   [index the-player]
   (if (valid-spot? index)
     (reset! board (assoc-in @board index (get @the-player :token)))
+    ; if the spot is already occupied, choose a random spot and place the token there
     (reset! board (assoc-in @board (choose-random-spot) (get @the-player :token))))
-  (get-other-player)
-  @board) 
+  (get-other-player) ; change/reset the current player variable
+  @board) ; return the board after taking the turn 
+
+; We got help from:
+; https://github.com/trptcolin/tictactoe-clojure/blob/master/src/tictactoe/core.clj
+; to get helper functions to check for a winner. Our version takes a basic idea from 
+; the cited source, but changes it to work with atoms and a 3D version of Tic Tac Toe.
 
 (defn winner-exists? 
+  "A helper function for winner. Determines whether or not a winner exists."
   [indexes]
   (apply = (map #(get-value-at-index %) indexes)))
 
 (defn winner-on-indexes 
+  "A helper function for winner. Returns the token of the winner if the winner exists on
+   the given index values."
   [indexes]
   (if (winner-exists? indexes)
     (get-value-at-index (first indexes))
@@ -267,9 +305,10 @@
   "Returns the winner of the game, or nil if there is no winner yet."
   [] 
   (let [winning-token (some #(winner-on-indexes %) all-winning-indexes)]
+       ; get the winning token by checking all winning combinations
     (cond
-    (= winning-token (@(@game :player1) :token)) "Player 1"
-    (= winning-token (@(@game :player2) :token)) "Player 2"
+    (= winning-token (get @(get @game :player1) :token)) "Player 1"
+    (= winning-token (get @(get @game :player2) :token)) "Player 2"
     :else nil)))
 
 (defn game-over?
@@ -280,49 +319,57 @@
     (not (= nil (winner)))))
 
 (defn update-wins-losses
+  "Updates the wins and losses counts for the two input players. 
+   The winner is always the first argument, and the loser is the second."
   [winner loser]
-  (reset! winner (assoc @winner :wins (inc (@winner :wins))))
-  (reset! loser (assoc @loser :losses (inc (@loser :losses)))))
+  (reset! winner (assoc @winner :wins (inc (get @winner :wins))))
+  (reset! loser (assoc @loser :losses (inc (get @loser :losses)))))
 
 (defn play-game
+  "Plays a game of 3D Tic Tac Toe."
   [the-game]
-  (reset! game the-game)
-  (reset! player (the-game :player1))
+  (reset! game the-game) ; reset the atom that monitors the game state globally
+  (reset! player (get the-game :player1)) ; reset the player atom to player1
   (loop [game-board @board
          current (get the-game :player1)
          other (get the-game :player2)]
-    (let [next-move-fn (make-program-into-fn (get @current :strategy))]
+    (let [next-move-fn (make-program-into-fn 
+                         (get @current :strategy))] ; get player1's strategy function
       (if (game-over?)
         (let [winning-player (winner)
               player1 (get the-game :player1)
               player2 (get the-game :player2)]
           (if (= winning-player "Player 1")
-            (update-wins-losses player1 player2)
-            (update-wins-losses player2 player1))
-          winning-player)
-        (recur
-          (take-turn (next-move-fn) current)
-          other
+            (update-wins-losses player1 player2)  ; update the wins and losses counts for both 
+            (update-wins-losses player2 player1)) ; players, depending on who won and who lost.
+          winning-player) ; return winner
+        (recur ; recurse through the function with:
+          (take-turn (next-move-fn) current) ; a board updated with the previous turn
+          other ; player1 and player2 alternating for the turns
           current)))))
 
-@board
-
 (defn play-against-each-other
+  "Makes a population of players play against each other."
   [population]
-  (let [x-players (filter #(= (get @% :token) "X") population)
-        o-players (filter #(= (get @% :token) "O") population)]
+  (let [x-players (filter #(= (get @% :token) "X") population)  ; separate all X-players...
+        o-players (filter #(= (get @% :token) "O") population)] ; and all O-players
     (loop [first-player (rand-nth x-players)
            second-player (rand-nth o-players)
+           ; X and O players are chosen randomly. This does leave a possibility that some 
+           ; players may not get a chance to play any game at all (although this is not very
+           ; likely), but it means that the element of randomness makes it possible for a
+           ; particular individual to play individuals that have varied strategies (as
+           ; opposed to playing similar individuals every time the function is called).
            counter 0]
-      (if (< counter (* 10 (count population)))
+      (if (< counter (* 10 (count population))) ; play 10x population count number of games
         (do
           (play-game (new-game first-player second-player))
-          (if (even? counter)
-            (recur
+          (if (even? counter) ; alternate between:
+            (recur            ; X-players going first, and
               (rand-nth x-players)
               (rand-nth o-players)
               (inc counter))
-            (recur
+            (recur            ; O-players going first.
               (rand-nth o-players)
               (rand-nth x-players)
               (inc counter))))))))
@@ -362,23 +409,32 @@
                  (cons 0 (reductions + (map program-size prog)))))))
 
 (defn select-node
+  "A helper function for koza-90-10.
+   Given a program, selects a random interior node (function) and returns it."
   [prog]
   (loop [node (select-random-subtree prog)]
-    (if (not= (type node) clojure.lang.PersistentVector)
+    ; if the node is not a vector (i.e. index), return it
+    (if (not= (type node) clojure.lang.PersistentVector) 
       node
       (recur (select-random-subtree prog)))))
 
 (defn select-leaf
+  "A helper function for koza-90-10.
+   Given a program, selects a random leaf node (terminal) and returns it."
   [prog]
   (loop [node (select-random-subtree prog)]
+    ; if the node is a vector (i.e. index), return it
     (if (= (type node) clojure.lang.PersistentVector)
       node
       (recur (select-random-subtree prog)))))
 
 (defn koza-90-10
+  "Selects a random subtree using the Koza 90/10 method.
+   There is a 90% chance that a function is returned, and a 10% chance that a terminal is
+   returned."
   [prog]
-  (let [prob (rand)]
-    (if (< prob 0.9)
+  (let [probability (rand)]
+    (if (< probability 0.9)
       (select-node prog)
       (select-leaf prog))))
 
@@ -389,14 +445,18 @@
   (replace-random-subtree prog (generate-prog (rand-int 3))))
 
 (defn crossover
-  "Replaces a random node in the program by a random node from another program."
+  "Replaces a random node in the program by a random node from another program.
+   Regular node selection is used 80% of the time, and Koza 90/10 is used 20% of the time."
  [prog1 prog2]
- (replace-random-subtree prog1 (select-random-subtree prog2)))
+ (let [probability (rand)]
+   (if (< probability 0.8)
+     (replace-random-subtree prog1 (select-random-subtree prog2))
+     (replace-random-subtree prog1 (koza-90-10 prog2)))))
 
 (defn eval-fitness
   "Evaluates the fitness of an individual (the greater, the better). 
    A value of 0 indicates that the individual has not won any games yet.
-   A value of 1 indicates that the individual has won all the games."
+   A value of 1 indicates that the individual has won all the games it played."
   [individual]
   (let [wins (get @individual :wins)
         losses (get @individual :losses)]
@@ -404,20 +464,21 @@
       0
       (/ wins (+ wins losses)))))
 
-(defn pair-individuals-errors
-  "A helper function for sort-population.
-   Returns a vector of [individual error] pairs."
+(defn pair-individuals-fitnesses
+  "A helper function for sort-population and fitness-proportionate-selection.
+   Returns a vector of [individual fitness] pairs."
   [population]
   (vec (map #(vector % (eval-fitness %)) population)))
 
 (defn sort-population
-  "Sorts the population of programs by descending order of fitness."
+  "Sorts the population of players by descending order of fitness."
   [population]
-  (let [individuals-errors (pair-individuals-errors population)]
-    (vec (map first ; get the individuals only (discards the error from [individual error])
-              (sort #(> (second %1) (second %2)) individuals-errors)))))
+  (let [individuals-fitnesses (pair-individuals-fitnesses population)]
+    (vec (map first ; get the individuals only (discards the fitness from [individual fitness])
+              (sort #(> (second %1) (second %2)) individuals-fitnesses)))))
 
 (defn sort-population-by-x-and-o
+  "Sorts the population of players by Xs and Os."
   [population]
   (vec (concat
          (filter #(= (get @% :token) "X") population)
@@ -433,39 +494,40 @@
            (repeatedly (/ pop-size 2) #(create-player "O" (generate-prog 3)))))
     (println "Error: pop-size should be an even integer.")))
 
-(defn tournament-selection
-  "Selects an individual from the population of programs using tournament-like selection."
-  [population tournament-size]
-  (let [index-value (apply min (take tournament-size 
-                                     (repeatedly #(rand-int (count population)))))]
-    ; index-value is the lowest integer returned by getting index positions repeatedly from
-    ; the population. The individual at this index position is the fittest as compared to 
-    ; others in this tournament (assuming that the population is already sorted).
-    (nth population index-value)))
-
+; We got help from:
+; http://stackoverflow.com/questions/177271/roulette-selection-in-genetic-algorithms
+; for a pseudocode algorithm for fitness proportionate selection, because we did not know how
+; to deal with the probability equation discussed in class. We then implemented the
+; selection method in Clojure after having referenced the above source. 
 
 (defn fitness-proportionate-selection
-  "Selects an individual from the population using fitness-proportionate (roulette wheel)
-   selection."
+  "Selects an individual from the population using fitness-proportionate selection."
   ([population]
-    (let [individuals-fitnesses (pair-individuals-errors population)]
-      (let [fitness-sum (reduce + (map second individuals-fitnesses))
-            stop-value (* (rand) fitness-sum)]
-        (loop [pairs individuals-fitnesses
-               counter 0]
-          (let [[individual fitness] (first pairs)]
-            (if (> (+ counter fitness) stop-value)
-              individual
-              (recur (rest pairs) (+ counter fitness)))))))))
+    (let [individuals-fitnesses (pair-individuals-fitnesses population)
+          ; get the sum of all fitnesses of the population, and then get a random stop-at
+          ; value to determine at what point to stop the selection loop
+          fitness-sum (reduce + (map second individuals-fitnesses))
+          stop-value (* (rand) fitness-sum)]
+      (loop [pairs individuals-fitnesses
+             counter 0] ; counter keeps track of how far we have got in the selection "wheel"
+        (let [individual (first (first pairs))
+              fitness (second (first pairs))]
+          ; if the counter and the individual's fitness falls in the "stop region,"
+          ; return the individual. otherwise, recur with the rest of the population and an
+          ; incremented counter.
+          (if (> (+ counter fitness) stop-value)
+            individual
+            (recur (rest pairs) (+ counter fitness))))))))
 
 (defn evolve
-  "Evolves the population of programs."
+  "Evolves the population of programs. The evolution runs for a certain number of maximum
+   generations before returning the current best individual."
   [population-size max-generations mutation-ratio crossover-ratio]
   (if (> (+ mutation-ratio crossover-ratio) 1)
     (println "Error: The sum of mutation and crossover ratios should be <= 1.")
     (loop [generation-number 0
            population (sort-population-by-x-and-o (generate-pop population-size))]
-      (play-against-each-other population)
+      (play-against-each-other population) ; make the individuals play against each other
       (let [sorted-by-error-population (sort-population population)
             best-individual (first sorted-by-error-population) 
             best-individual-fitness (eval-fitness best-individual)]
@@ -482,11 +544,14 @@
           :else (recur
                   (inc generation-number)
                   (sort-population-by-x-and-o
-                    (for [i (range population-size)] ; return a list of population-size programs
-                      (let [genetic-operator (rand)
-                            token (if (even? i)
-                                    "X"
-                                    "O")]
+                    (for [i (range population-size)] 
+                      (let [genetic-operator (rand) ; the probability of choosing a certain
+                                                    ; genetic operator
+                            token (if (even? i) ; alternate between:
+                                    "X"         ; token X, and
+                                    "O")]       ; token Y, for the new players in the population.
+                                                ; this ensures that the number of X and O players
+                                                ; remains similar.
                         (cond
                           (< genetic-operator mutation-ratio) ; mutation
                               (let [parent (fitness-proportionate-selection population)
@@ -494,10 +559,16 @@
                                 (create-player token (mutate strategy)))
                           (< genetic-operator (+ mutation-ratio crossover-ratio)) ; crossover
                               (let [parent1 (fitness-proportionate-selection population)
-                                    parent2 (tournament-selection sorted-by-error-population 5)
+                                    parent2 (fitness-proportionate-selection population)
                                     strategy1 (get @parent1 :strategy)
                                     strategy2 (get @parent2 :strategy)]
                                 (create-player token (crossover strategy1 strategy2)))
-                          :else (fitness-proportionate-selection population)))))))))))
+                          :else (fitness-proportionate-selection population))))))))))) ; reproduction
 
-(evolve 50 20 0.5 0.4)
+(defn genetic-programming
+  "The main function."
+  []
+  (evolve 50 20 0.5 0.4))
+
+(genetic-programming)
+           
